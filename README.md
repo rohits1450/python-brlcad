@@ -84,6 +84,13 @@ db.get_type("random_csg.c") # → "combination"
 ```
 
 ---
+## Procedural Geometry Demo
+
+Python-generated rhombicuboctahedron rendered in MGED (24 vertices, 44 faces):
+
+![Rhombicuboctahedron](assets/rhombicuboctahedron.png)
+
+---
 
 ## Sample Output
 
