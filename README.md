@@ -1,39 +1,45 @@
-# BRL-CAD PYTHON BINDINGS
+# BRL-CAD Python Bindings
 
-A Python binding prototype for [BRL-CAD](https://brlcad.org/) using CFFI, exposing
-BRL-CAD's core geometry database (`librt`) to Python.
+A Python binding prototype for [BRL-CAD](https://brlcad.org/) using CFFI,
+exposing BRL-CAD's geometry database to Python via a clean, Pythonic API.
 
-Built as part of a GSoC 2026 proposal for the
-**Python Geometry Bindings** project under BRL-CAD by Rohit S
+Built **Python Geometry Bindings** project under BRL-CAD by Rohit S.
+
+---
+
+## Architecture
+
+```
+User Python code
+      ↓
+brlcad/ (Pythonic API — Database, GeometryObject, BoundingBox)
+      ↓
+_brlcad.pyd (CFFI compiled C extension)
+      ↓
+brlcad_wrap.c (C wrapper over BRL-CAD librt / libwdb)
+      ↓
+BRL-CAD .g geometry database
+```
 
 ---
 
 ## What It Does
 
 - Opens a BRL-CAD `.g` geometry database from Python
-- Lists all objects in the database
-- Queries object types (`solid`, `combination`, `region`)
-- Checks object existence by name
-- Computes 3D bounding boxes via `librt` raytracer
-
----
-
-## Architecture
-
-- `test_open.py` → Python entry point
-- `_brlcad.pyd` → CFFI compiled extension
-- `brlcad_wrap.c` → C wrapper over BRL-CAD librt
-- BRL-CAD `librt` / `libbu` → core geometry engine
-- `.g` file → geometry database
-
+- Lists and queries all objects via clean Python classes
+- Returns typed objects (`GeometryObject`) with attributes
+- Computes 3D bounding boxes with center and size helpers
+- Writes geometry to `.g` via `libwdb` (BOT mesh support)
+- Procedural geometry generation from Python (rhombicuboctahedron demo)
 
 ---
 
 ## Requirements
 
-- BRL-CAD compiled from source (tested with BRL-CAD trunk, Windows)
+- BRL-CAD compiled from source (tested on Windows, Visual Studio 2022)
 - Python 3.13+
 - CFFI (`pip install cffi`)
+- scipy (`pip install scipy`) — for rhombicuboctahedron demo only
 
 ---
 
@@ -42,63 +48,89 @@ Built as part of a GSoC 2026 proposal for the
 ```powershell
 cd D:\python-brlcad
 python build_brlcad.py
-This compiles brlcad_wrap.c into _brlcad.cp313-win_amd64.pyd.
 ```
+
+---
+
 ## Usage
-```
-python
-import os, sys
-os.add_dll_directory(r"D:\brlcad\build\bin")
-sys.path.insert(0, r"D:\python-brlcad")
 
-from _brlcad import ffi, lib
+```python
+import brlcad
 
-db = r"D:/brlcad/build/bin/random_csg.g"
+# Open database
+db = brlcad.open("model.g")
+print(db)
+# → Database(path='model.g', objects=7)
 
-# Count objects
-print(lib.brlcad_open_db(db.encode()))          # → 7
+# Query object
+obj = db.get("prim_0.s")
+print(obj)
+# → GeometryObject(name='prim_0.s', type='solid')
 
-# List all objects
-lib.brlcad_list_objects(db.encode())
-
-# Get object type
-t = ffi.string(lib.brlcad_get_object_type(db.encode(), b"prim_0.s")).decode()
-print(t)                                         # → "solid"
-
-# Check existence
-lib.brlcad_object_exists(db.encode(), b"prim_0.s")   # → 1
+# Attributes
+print(obj.type)          # → "solid"
+print(obj.exists)        # → True
 
 # Bounding box
-min_pt = ffi.new("double")
-max_pt = ffi.new("double")
-lib.brlcad_get_bounding_box(db.encode(), b"random_csg.c", min_pt, max_pt)
-print(f"min: ({min_pt:.2f}, {min_pt:.2f}, {min_pt:.2f})")
-print(f"max: ({max_pt:.2f}, {max_pt:.2f}, {max_pt:.2f})")
+bbox = obj.bounding_box
+print(bbox.min)          # → (-46.0, 13.0, -51.0)
+print(bbox.max)          # → (-10.0, 49.0, -15.0)
+print(bbox.center)       # → (-28.0, 31.0, -33.0)
+print(bbox.size)         # → (36.0, 36.0, 36.0)
+
+# Existence check
+db.exists("nonexistent") # → False
+db.get_type("random_csg.c") # → "combination"
 ```
+
+---
+
 ## Sample Output
+
 ```
- Objects in DB: 7
+Database(path='random_csg.g', objects=7)
+📦 Total objects: 7
 
-📋 All objects:
-_GLOBAL, prim_0.s, prim_1.s, prim_2.s, prim_3.s, prim_4.s, random_csg.c
+🔷 GeometryObject(name='prim_0.s', type='solid')
+   type  : solid
+   bbox  : BoundingBox(min=(-46.0, 13.0, -51.0), max=(-10.0, 49.0, -15.0))
+   center: (-28.0, 31.0, -33.0)
+   size  : (36.0, 36.0, 36.0)
 
-🔍 Object types:
-  prim_0.s             → solid
-  prim_1.s             → solid
-  random_csg.c         → combination
-  nonexistent          → not_found
+🔷 GeometryObject(name='random_csg.c', type='combination')
+   type  : combination
+   bbox  : BoundingBox(min=(-39.0, -20.0, -16.0), max=(18.0, 15.0, 35.0))
+   center: (-10.5, -2.5, 9.5)
+   size  : (57.0, 35.0, 51.0)
 
-📐 Bounding box (random_csg.c):
-  min: (-39.00, -20.00, -16.00)
-  max: (18.00, 15.00, 35.00)
-```  
+❌ 'nonexistent' not found
+```
+
+---
+
+## Procedural Geometry Demo
+
+```powershell
+python rhombicuboctahedron.py
+```
+
+Generates a mathematically precise rhombicuboctahedron (24 vertices, 44 faces)
+as a BRL-CAD BOT primitive, written to `rhombicuboctahedron.g` and renderable in MGED.
+
+---
+
 ## Files
-| File            | Purpose                      |
-| --------------- | ---------------------------- |
-| brlcad_wrap.c   | C wrapper over BRL-CAD librt |
-| brlcad_wrap.h   | Public C API header          |
-| build_brlcad.py | CFFI build script            |
-| test_open.py    | Python demo and test         |
-| random_csg.c    | Generates sample .g database |
 
+| File | Purpose |
+|---|---|
+| `brlcad/` | Pythonic API package (`Database`, `GeometryObject`, `BoundingBox`) |
+| `brlcad_wrap.c` | C wrapper over BRL-CAD `librt` / `libwdb` |
+| `brlcad_wrap.h` | Public C API header |
+| `build_brlcad.py` | CFFI build script |
+| `examples/demo.py` | Clean usage demo |
+| `rhombicuboctahedron.py` | Procedural geometry generator demo |
+| `random_csg.c` | C procedural generator (also in BRL-CAD PR #224) |
 
+---
+
+Rohit S — GSoC 2026 applicant
