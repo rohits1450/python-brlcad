@@ -575,6 +575,7 @@ static void (*_cffi_call_python_org)(struct _cffi_externpy_s *, char *);
 #include "rt/db_internal.h"
 #include "raytrace.h"
 #include "brlcad_wrap.h"
+#include "wdb.h"
 
 int brlcad_open_db(const char *filename) {
     struct db_i *dbip;
@@ -669,35 +670,160 @@ int brlcad_object_exists(const char *filename, const char *objname) {
     return (dp != RT_DIR_NULL) ? 1 : 0;
 }
 
+int brlcad_create_bot(const char *filename, const char *objname,
+                      int num_vertices, double *vertices,
+                      int num_faces, int *faces) {
+    struct rt_wdb *wdbp;
+    wdbp = wdb_fopen(filename);
+    if (wdbp == NULL) return -1;
+
+    /* Convert flat double array to point_t array */
+    point_t *pts = (point_t *)bu_malloc(num_vertices * sizeof(point_t), "pts");
+    for (int i = 0; i < num_vertices; i++) {
+        pts[i][X] = vertices[i * 3 + 0];
+        pts[i][Y] = vertices[i * 3 + 1];
+        pts[i][Z] = vertices[i * 3 + 2];
+    }
+
+    /* Convert flat int array to face indices */
+    int *face_arr = (int *)bu_malloc(num_faces * 3 * sizeof(int), "faces");
+    for (int i = 0; i < num_faces * 3; i++) {
+        face_arr[i] = faces[i];
+    }
+
+    int ret = mk_bot(wdbp, objname, RT_BOT_SOLID, RT_BOT_UNORIENTED, 0,
+                     num_vertices, num_faces,
+                     pts, face_arr, NULL, 0);
+
+    bu_free(pts, "pts");
+    bu_free(face_arr, "faces");
+    wdb_close(wdbp);
+    return ret;
+}
+
 
 /************************************************************/
 
 static void *_cffi_types[] = {
 /*  0 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // char const *()(char const *, char const *)
-/*  1 */ _CFFI_OP(_CFFI_OP_POINTER, 20), // char const *
+/*  1 */ _CFFI_OP(_CFFI_OP_POINTER, 28), // char const *
 /*  2 */ _CFFI_OP(_CFFI_OP_NOOP, 1),
 /*  3 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/*  4 */ _CFFI_OP(_CFFI_OP_FUNCTION, 22), // int()(char const *)
+/*  4 */ _CFFI_OP(_CFFI_OP_FUNCTION, 20), // int()(char const *)
 /*  5 */ _CFFI_OP(_CFFI_OP_NOOP, 1),
 /*  6 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/*  7 */ _CFFI_OP(_CFFI_OP_FUNCTION, 22), // int()(char const *, char const *)
+/*  7 */ _CFFI_OP(_CFFI_OP_FUNCTION, 20), // int()(char const *, char const *)
 /*  8 */ _CFFI_OP(_CFFI_OP_NOOP, 1),
 /*  9 */ _CFFI_OP(_CFFI_OP_NOOP, 1),
 /* 10 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 11 */ _CFFI_OP(_CFFI_OP_FUNCTION, 22), // int()(char const *, char const *, double *, double *)
+/* 11 */ _CFFI_OP(_CFFI_OP_FUNCTION, 20), // int()(char const *, char const *, double *, double *)
 /* 12 */ _CFFI_OP(_CFFI_OP_NOOP, 1),
 /* 13 */ _CFFI_OP(_CFFI_OP_NOOP, 1),
-/* 14 */ _CFFI_OP(_CFFI_OP_POINTER, 21), // double *
+/* 14 */ _CFFI_OP(_CFFI_OP_POINTER, 29), // double *
 /* 15 */ _CFFI_OP(_CFFI_OP_NOOP, 14),
 /* 16 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 17 */ _CFFI_OP(_CFFI_OP_FUNCTION, 23), // void()(char const *)
+/* 17 */ _CFFI_OP(_CFFI_OP_FUNCTION, 20), // int()(char const *, char const *, int, double *, int, int *)
 /* 18 */ _CFFI_OP(_CFFI_OP_NOOP, 1),
-/* 19 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 20 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 2), // char
-/* 21 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 14), // double
-/* 22 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7), // int
-/* 23 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 0), // void
+/* 19 */ _CFFI_OP(_CFFI_OP_NOOP, 1),
+/* 20 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7), // int
+/* 21 */ _CFFI_OP(_CFFI_OP_NOOP, 14),
+/* 22 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 23 */ _CFFI_OP(_CFFI_OP_POINTER, 20), // int *
+/* 24 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 25 */ _CFFI_OP(_CFFI_OP_FUNCTION, 30), // void()(char const *)
+/* 26 */ _CFFI_OP(_CFFI_OP_NOOP, 1),
+/* 27 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 28 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 2), // char
+/* 29 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 14), // double
+/* 30 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 0), // void
 };
+
+static int _cffi_d_brlcad_create_bot(char const * x0, char const * x1, int x2, double * x3, int x4, int * x5)
+{
+  return brlcad_create_bot(x0, x1, x2, x3, x4, x5);
+}
+#ifndef PYPY_VERSION
+static PyObject *
+_cffi_f_brlcad_create_bot(PyObject *self, PyObject *args)
+{
+  char const * x0;
+  char const * x1;
+  int x2;
+  double * x3;
+  int x4;
+  int * x5;
+  Py_ssize_t datasize;
+  struct _cffi_freeme_s *large_args_free = NULL;
+  int result;
+  PyObject *pyresult;
+  PyObject *arg0;
+  PyObject *arg1;
+  PyObject *arg2;
+  PyObject *arg3;
+  PyObject *arg4;
+  PyObject *arg5;
+
+  if (!PyArg_UnpackTuple(args, "brlcad_create_bot", 6, 6, &arg0, &arg1, &arg2, &arg3, &arg4, &arg5))
+    return NULL;
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(1), arg0, (char **)&x0);
+  if (datasize != 0) {
+    x0 = ((size_t)datasize) <= 640 ? (char const *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(1), arg0, (char **)&x0,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(1), arg1, (char **)&x1);
+  if (datasize != 0) {
+    x1 = ((size_t)datasize) <= 640 ? (char const *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(1), arg1, (char **)&x1,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  x2 = _cffi_to_c_int(arg2, int);
+  if (x2 == (int)-1 && PyErr_Occurred())
+    return NULL;
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(14), arg3, (char **)&x3);
+  if (datasize != 0) {
+    x3 = ((size_t)datasize) <= 640 ? (double *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(14), arg3, (char **)&x3,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  x4 = _cffi_to_c_int(arg4, int);
+  if (x4 == (int)-1 && PyErr_Occurred())
+    return NULL;
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(23), arg5, (char **)&x5);
+  if (datasize != 0) {
+    x5 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(23), arg5, (char **)&x5,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  Py_BEGIN_ALLOW_THREADS
+  _cffi_restore_errno();
+  { result = brlcad_create_bot(x0, x1, x2, x3, x4, x5); }
+  _cffi_save_errno();
+  Py_END_ALLOW_THREADS
+
+  (void)self; /* unused */
+  pyresult = _cffi_from_c_int(result, int);
+  if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
+  return pyresult;
+}
+#else
+#  define _cffi_f_brlcad_create_bot _cffi_d_brlcad_create_bot
+#endif
 
 static int _cffi_d_brlcad_get_bounding_box(char const * x0, char const * x1, double * x2, double * x3)
 {
@@ -955,9 +1081,10 @@ _cffi_f_brlcad_open_db(PyObject *self, PyObject *arg0)
 #endif
 
 static const struct _cffi_global_s _cffi_globals[] = {
+  { "brlcad_create_bot", (void *)_cffi_f_brlcad_create_bot, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 17), (void *)_cffi_d_brlcad_create_bot },
   { "brlcad_get_bounding_box", (void *)_cffi_f_brlcad_get_bounding_box, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 11), (void *)_cffi_d_brlcad_get_bounding_box },
   { "brlcad_get_object_type", (void *)_cffi_f_brlcad_get_object_type, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 0), (void *)_cffi_d_brlcad_get_object_type },
-  { "brlcad_list_objects", (void *)_cffi_f_brlcad_list_objects, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 17), (void *)_cffi_d_brlcad_list_objects },
+  { "brlcad_list_objects", (void *)_cffi_f_brlcad_list_objects, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 25), (void *)_cffi_d_brlcad_list_objects },
   { "brlcad_object_exists", (void *)_cffi_f_brlcad_object_exists, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 7), (void *)_cffi_d_brlcad_object_exists },
   { "brlcad_open_db", (void *)_cffi_f_brlcad_open_db, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 4), (void *)_cffi_d_brlcad_open_db },
 };
@@ -969,12 +1096,12 @@ static const struct _cffi_type_context_s _cffi_type_context = {
   NULL,  /* no struct_unions */
   NULL,  /* no enums */
   NULL,  /* no typenames */
-  5,  /* num_globals */
+  6,  /* num_globals */
   0,  /* num_struct_unions */
   0,  /* num_enums */
   0,  /* num_typenames */
   NULL,  /* no includes */
-  24,  /* num_types */
+  31,  /* num_types */
   0,  /* flags */
 };
 

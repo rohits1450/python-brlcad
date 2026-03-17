@@ -21,6 +21,10 @@ int brlcad_get_bounding_box(const char *filename, const char *objname,
 /* Returns 1 if object exists, 0 if not */
 int brlcad_object_exists(const char *filename, const char *objname);
 
+int brlcad_create_bot(const char *filename, const char *objname,
+                      int num_vertices, double *vertices,
+                      int num_faces, int *faces);
+
 #ifdef __cplusplus
 }
 #endif

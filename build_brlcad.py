@@ -10,6 +10,10 @@ ffi.cdef("""
     int         brlcad_get_bounding_box(const char *filename, const char *objname,
                                         double *min_pt, double *max_pt);
     int         brlcad_object_exists(const char *filename, const char *objname);
+         int brlcad_create_bot(const char *filename, const char *objname,
+                      int num_vertices, double *vertices,
+                      int num_faces, int *faces);
+
 """)
 
 BRLCAD_BUILD = r"D:/brlcad/build"
