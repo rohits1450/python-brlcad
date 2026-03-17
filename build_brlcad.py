@@ -4,8 +4,12 @@ import os
 ffi = cffi.FFI()
 
 ffi.cdef("""
-    int brlcad_open_db(const char *filename);
-    void brlcad_list_objects(const char *filename);
+    int         brlcad_open_db(const char *filename);
+    void        brlcad_list_objects(const char *filename);
+    const char* brlcad_get_object_type(const char *filename, const char *objname);
+    int         brlcad_get_bounding_box(const char *filename, const char *objname,
+                                        double *min_pt, double *max_pt);
+    int         brlcad_object_exists(const char *filename, const char *objname);
 """)
 
 BRLCAD_BUILD = r"D:/brlcad/build"

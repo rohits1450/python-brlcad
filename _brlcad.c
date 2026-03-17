@@ -574,8 +574,8 @@ static void (*_cffi_call_python_org)(struct _cffi_externpy_s *, char *);
 #include "rt/db_io.h"
 #include "rt/db_internal.h"
 #include "raytrace.h"
+#include "brlcad_wrap.h"
 
-/* Opens a .g file, returns number of objects. -1 on error */
 int brlcad_open_db(const char *filename) {
     struct db_i *dbip;
     dbip = db_open(filename, DB_OPEN_READONLY);
@@ -589,7 +589,6 @@ int brlcad_open_db(const char *filename) {
     return count;
 }
 
-/* List object names — prints to stdout */
 void brlcad_list_objects(const char *filename) {
     struct db_i *dbip;
     struct directory *dp;
@@ -605,20 +604,228 @@ void brlcad_list_objects(const char *filename) {
     db_close(dbip);
 }
 
+const char* brlcad_get_object_type(const char *filename, const char *objname) {
+    struct db_i *dbip;
+    struct directory *dp;
+    const char *type;
+
+    dbip = db_open(filename, DB_OPEN_READONLY);
+    if (dbip == DBI_NULL) return "error";
+    db_dirbuild(dbip);
+
+    dp = db_lookup(dbip, objname, LOOKUP_QUIET);
+    if (dp == RT_DIR_NULL) {
+        db_close(dbip);
+        return "not_found";
+    }
+
+    if (dp->d_flags & RT_DIR_COMB) {
+        if (dp->d_flags & RT_DIR_REGION)
+            type = "region";
+        else
+            type = "combination";
+    } else if (dp->d_flags & RT_DIR_SOLID) {
+        type = "solid";
+    } else {
+        type = "unknown";
+    }
+
+    db_close(dbip);
+    return type;
+}
+
+int brlcad_get_bounding_box(const char *filename, const char *objname,
+                              double *min_pt, double *max_pt) {
+    struct rt_i *rtip;
+    rtip = rt_dirbuild(filename, NULL, 0);
+    if (rtip == RTI_NULL) return -1;
+
+    if (rt_gettree(rtip, objname) < 0) {
+        rt_free_rti(rtip);
+        return -1;
+    }
+
+    rt_prep_parallel(rtip, 1);
+
+    min_pt[0] = rtip->mdl_min[X];
+    min_pt[1] = rtip->mdl_min[Y];
+    min_pt[2] = rtip->mdl_min[Z];
+    max_pt[0] = rtip->mdl_max[X];
+    max_pt[1] = rtip->mdl_max[Y];
+    max_pt[2] = rtip->mdl_max[Z];
+
+    rt_free_rti(rtip);
+    return 0;
+}
+
+int brlcad_object_exists(const char *filename, const char *objname) {
+    struct db_i *dbip;
+    struct directory *dp;
+    dbip = db_open(filename, DB_OPEN_READONLY);
+    if (dbip == DBI_NULL) return 0;
+    db_dirbuild(dbip);
+    dp = db_lookup(dbip, objname, LOOKUP_QUIET);
+    db_close(dbip);
+    return (dp != RT_DIR_NULL) ? 1 : 0;
+}
+
 
 /************************************************************/
 
 static void *_cffi_types[] = {
-/*  0 */ _CFFI_OP(_CFFI_OP_FUNCTION, 7), // int()(char const *)
-/*  1 */ _CFFI_OP(_CFFI_OP_POINTER, 6), // char const *
-/*  2 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/*  3 */ _CFFI_OP(_CFFI_OP_FUNCTION, 8), // void()(char const *)
-/*  4 */ _CFFI_OP(_CFFI_OP_NOOP, 1),
-/*  5 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/*  6 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 2), // char
-/*  7 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7), // int
-/*  8 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 0), // void
+/*  0 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // char const *()(char const *, char const *)
+/*  1 */ _CFFI_OP(_CFFI_OP_POINTER, 20), // char const *
+/*  2 */ _CFFI_OP(_CFFI_OP_NOOP, 1),
+/*  3 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/*  4 */ _CFFI_OP(_CFFI_OP_FUNCTION, 22), // int()(char const *)
+/*  5 */ _CFFI_OP(_CFFI_OP_NOOP, 1),
+/*  6 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/*  7 */ _CFFI_OP(_CFFI_OP_FUNCTION, 22), // int()(char const *, char const *)
+/*  8 */ _CFFI_OP(_CFFI_OP_NOOP, 1),
+/*  9 */ _CFFI_OP(_CFFI_OP_NOOP, 1),
+/* 10 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 11 */ _CFFI_OP(_CFFI_OP_FUNCTION, 22), // int()(char const *, char const *, double *, double *)
+/* 12 */ _CFFI_OP(_CFFI_OP_NOOP, 1),
+/* 13 */ _CFFI_OP(_CFFI_OP_NOOP, 1),
+/* 14 */ _CFFI_OP(_CFFI_OP_POINTER, 21), // double *
+/* 15 */ _CFFI_OP(_CFFI_OP_NOOP, 14),
+/* 16 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 17 */ _CFFI_OP(_CFFI_OP_FUNCTION, 23), // void()(char const *)
+/* 18 */ _CFFI_OP(_CFFI_OP_NOOP, 1),
+/* 19 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 20 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 2), // char
+/* 21 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 14), // double
+/* 22 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7), // int
+/* 23 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 0), // void
 };
+
+static int _cffi_d_brlcad_get_bounding_box(char const * x0, char const * x1, double * x2, double * x3)
+{
+  return brlcad_get_bounding_box(x0, x1, x2, x3);
+}
+#ifndef PYPY_VERSION
+static PyObject *
+_cffi_f_brlcad_get_bounding_box(PyObject *self, PyObject *args)
+{
+  char const * x0;
+  char const * x1;
+  double * x2;
+  double * x3;
+  Py_ssize_t datasize;
+  struct _cffi_freeme_s *large_args_free = NULL;
+  int result;
+  PyObject *pyresult;
+  PyObject *arg0;
+  PyObject *arg1;
+  PyObject *arg2;
+  PyObject *arg3;
+
+  if (!PyArg_UnpackTuple(args, "brlcad_get_bounding_box", 4, 4, &arg0, &arg1, &arg2, &arg3))
+    return NULL;
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(1), arg0, (char **)&x0);
+  if (datasize != 0) {
+    x0 = ((size_t)datasize) <= 640 ? (char const *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(1), arg0, (char **)&x0,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(1), arg1, (char **)&x1);
+  if (datasize != 0) {
+    x1 = ((size_t)datasize) <= 640 ? (char const *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(1), arg1, (char **)&x1,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(14), arg2, (char **)&x2);
+  if (datasize != 0) {
+    x2 = ((size_t)datasize) <= 640 ? (double *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(14), arg2, (char **)&x2,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(14), arg3, (char **)&x3);
+  if (datasize != 0) {
+    x3 = ((size_t)datasize) <= 640 ? (double *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(14), arg3, (char **)&x3,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  Py_BEGIN_ALLOW_THREADS
+  _cffi_restore_errno();
+  { result = brlcad_get_bounding_box(x0, x1, x2, x3); }
+  _cffi_save_errno();
+  Py_END_ALLOW_THREADS
+
+  (void)self; /* unused */
+  pyresult = _cffi_from_c_int(result, int);
+  if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
+  return pyresult;
+}
+#else
+#  define _cffi_f_brlcad_get_bounding_box _cffi_d_brlcad_get_bounding_box
+#endif
+
+static char const * _cffi_d_brlcad_get_object_type(char const * x0, char const * x1)
+{
+  return brlcad_get_object_type(x0, x1);
+}
+#ifndef PYPY_VERSION
+static PyObject *
+_cffi_f_brlcad_get_object_type(PyObject *self, PyObject *args)
+{
+  char const * x0;
+  char const * x1;
+  Py_ssize_t datasize;
+  struct _cffi_freeme_s *large_args_free = NULL;
+  char const * result;
+  PyObject *pyresult;
+  PyObject *arg0;
+  PyObject *arg1;
+
+  if (!PyArg_UnpackTuple(args, "brlcad_get_object_type", 2, 2, &arg0, &arg1))
+    return NULL;
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(1), arg0, (char **)&x0);
+  if (datasize != 0) {
+    x0 = ((size_t)datasize) <= 640 ? (char const *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(1), arg0, (char **)&x0,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(1), arg1, (char **)&x1);
+  if (datasize != 0) {
+    x1 = ((size_t)datasize) <= 640 ? (char const *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(1), arg1, (char **)&x1,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  Py_BEGIN_ALLOW_THREADS
+  _cffi_restore_errno();
+  { result = brlcad_get_object_type(x0, x1); }
+  _cffi_save_errno();
+  Py_END_ALLOW_THREADS
+
+  (void)self; /* unused */
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1));
+  if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
+  return pyresult;
+}
+#else
+#  define _cffi_f_brlcad_get_object_type _cffi_d_brlcad_get_object_type
+#endif
 
 static void _cffi_d_brlcad_list_objects(char const * x0)
 {
@@ -654,6 +861,59 @@ _cffi_f_brlcad_list_objects(PyObject *self, PyObject *arg0)
 }
 #else
 #  define _cffi_f_brlcad_list_objects _cffi_d_brlcad_list_objects
+#endif
+
+static int _cffi_d_brlcad_object_exists(char const * x0, char const * x1)
+{
+  return brlcad_object_exists(x0, x1);
+}
+#ifndef PYPY_VERSION
+static PyObject *
+_cffi_f_brlcad_object_exists(PyObject *self, PyObject *args)
+{
+  char const * x0;
+  char const * x1;
+  Py_ssize_t datasize;
+  struct _cffi_freeme_s *large_args_free = NULL;
+  int result;
+  PyObject *pyresult;
+  PyObject *arg0;
+  PyObject *arg1;
+
+  if (!PyArg_UnpackTuple(args, "brlcad_object_exists", 2, 2, &arg0, &arg1))
+    return NULL;
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(1), arg0, (char **)&x0);
+  if (datasize != 0) {
+    x0 = ((size_t)datasize) <= 640 ? (char const *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(1), arg0, (char **)&x0,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(1), arg1, (char **)&x1);
+  if (datasize != 0) {
+    x1 = ((size_t)datasize) <= 640 ? (char const *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(1), arg1, (char **)&x1,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  Py_BEGIN_ALLOW_THREADS
+  _cffi_restore_errno();
+  { result = brlcad_object_exists(x0, x1); }
+  _cffi_save_errno();
+  Py_END_ALLOW_THREADS
+
+  (void)self; /* unused */
+  pyresult = _cffi_from_c_int(result, int);
+  if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
+  return pyresult;
+}
+#else
+#  define _cffi_f_brlcad_object_exists _cffi_d_brlcad_object_exists
 #endif
 
 static int _cffi_d_brlcad_open_db(char const * x0)
@@ -695,8 +955,11 @@ _cffi_f_brlcad_open_db(PyObject *self, PyObject *arg0)
 #endif
 
 static const struct _cffi_global_s _cffi_globals[] = {
-  { "brlcad_list_objects", (void *)_cffi_f_brlcad_list_objects, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 3), (void *)_cffi_d_brlcad_list_objects },
-  { "brlcad_open_db", (void *)_cffi_f_brlcad_open_db, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 0), (void *)_cffi_d_brlcad_open_db },
+  { "brlcad_get_bounding_box", (void *)_cffi_f_brlcad_get_bounding_box, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 11), (void *)_cffi_d_brlcad_get_bounding_box },
+  { "brlcad_get_object_type", (void *)_cffi_f_brlcad_get_object_type, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 0), (void *)_cffi_d_brlcad_get_object_type },
+  { "brlcad_list_objects", (void *)_cffi_f_brlcad_list_objects, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 17), (void *)_cffi_d_brlcad_list_objects },
+  { "brlcad_object_exists", (void *)_cffi_f_brlcad_object_exists, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 7), (void *)_cffi_d_brlcad_object_exists },
+  { "brlcad_open_db", (void *)_cffi_f_brlcad_open_db, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 4), (void *)_cffi_d_brlcad_open_db },
 };
 
 static const struct _cffi_type_context_s _cffi_type_context = {
@@ -706,12 +969,12 @@ static const struct _cffi_type_context_s _cffi_type_context = {
   NULL,  /* no struct_unions */
   NULL,  /* no enums */
   NULL,  /* no typenames */
-  2,  /* num_globals */
+  5,  /* num_globals */
   0,  /* num_struct_unions */
   0,  /* num_enums */
   0,  /* num_typenames */
   NULL,  /* no includes */
-  9,  /* num_types */
+  24,  /* num_types */
   0,  /* flags */
 };
 
