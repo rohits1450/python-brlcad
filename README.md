@@ -20,15 +20,12 @@ Built as part of a GSoC 2026 proposal for the
 
 ## Architecture
 
-Python (test_open.py)
-->
-CFFI Extension (_brlcad.pyd)
-->
-C Wrapper (brlcad_wrap.c)
-->
-BRL-CAD librt / libbu
-->
-.g Geometry Database
+- `test_open.py` → Python entry point
+- `_brlcad.pyd` → CFFI compiled extension
+- `brlcad_wrap.c` → C wrapper over BRL-CAD librt
+- BRL-CAD `librt` / `libbu` → core geometry engine
+- `.g` file → geometry database
+
 
 ---
 
